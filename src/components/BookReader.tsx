@@ -1,15 +1,22 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   ArrowLeft, 
   Languages, 
   Loader2, 
   MessageSquare,
   X,
-  BookOpen 
+  BookOpen,
+  Volume2,
+  VolumeX,
+  Video,
+  BookText,
+  Play,
+  Pause
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ChatAssistant } from "./ChatAssistant";
@@ -60,7 +67,92 @@ export const BookReader = ({ book, onBack }: BookReaderProps) => {
   const [selectedText, setSelectedText] = useState("");
   const [currentPage, setCurrentPage] = useState(0);
   const [pages, setPages] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<"text" | "audio" | "video">("text");
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [videoImage, setVideoImage] = useState<string | null>(null);
+  const [isLoadingVideo, setIsLoadingVideo] = useState(false);
+  const speechSynthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    return () => {
+      if (speechSynthesisRef.current) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const startAudio = () => {
+    const textToSpeak = displayContent;
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(textToSpeak);
+      utterance.rate = 0.9;
+      utterance.pitch = 1;
+      utterance.onend = () => setIsPlaying(false);
+      speechSynthesisRef.current = utterance;
+      window.speechSynthesis.speak(utterance);
+      setIsPlaying(true);
+    } else {
+      toast({
+        title: "Audio not supported",
+        description: "Your browser doesn't support text-to-speech",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const pauseAudio = () => {
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+      setIsPlaying(false);
+    }
+  };
+
+  const generateVideoImage = async () => {
+    setIsLoadingVideo(true);
+    try {
+      const textContent = pages[currentPage] || content;
+      
+      const { data: promptData, error: promptError } = await supabase.functions.invoke('generate-image-prompts', {
+        body: { text: textContent, pageNumber: currentPage + 1 }
+      });
+
+      if (promptError) throw promptError;
+
+      const { data: imageData, error: imageError } = await supabase.functions.invoke('generate-video-image', {
+        body: { prompt: promptData.imagePrompt }
+      });
+
+      if (imageError) throw imageError;
+
+      setVideoImage(imageData.imageUrl);
+      toast({
+        title: "Video mode ready",
+        description: "Image generated successfully",
+      });
+    } catch (error) {
+      console.error('Error generating video:', error);
+      toast({
+        title: "Video generation failed",
+        description: "Please try again later",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingVideo(false);
+    }
+  };
+
+  useEffect(() => {
+    if (viewMode === "video" && !videoImage) {
+      generateVideoImage();
+    }
+    if (viewMode === "audio" && isPlaying) {
+      pauseAudio();
+      setTimeout(() => startAudio(), 100);
+    }
+  }, [currentPage, viewMode]);
 
   useEffect(() => {
     const fetchBookContent = async () => {
@@ -205,6 +297,23 @@ export const BookReader = ({ book, onBack }: BookReaderProps) => {
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
+              <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)} className="w-auto">
+                <TabsList className="grid w-full grid-cols-3 rounded-xl">
+                  <TabsTrigger value="text" className="rounded-lg">
+                    <BookText className="h-4 w-4 mr-1" />
+                    Text
+                  </TabsTrigger>
+                  <TabsTrigger value="audio" className="rounded-lg">
+                    <Volume2 className="h-4 w-4 mr-1" />
+                    Audio
+                  </TabsTrigger>
+                  <TabsTrigger value="video" className="rounded-lg">
+                    <Video className="h-4 w-4 mr-1" />
+                    Video
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+
               <Select value={selectedLanguage} onValueChange={translateCurrentPage} disabled={isTranslating}>
                 <SelectTrigger className="w-[140px] sm:w-[160px] rounded-xl bg-background/50">
                   <Languages className="mr-2 h-4 w-4" />
@@ -218,6 +327,58 @@ export const BookReader = ({ book, onBack }: BookReaderProps) => {
                   ))}
                 </SelectContent>
               </Select>
+
+              {viewMode === "audio" && (
+                <Button
+                  variant="outline"
+                  onClick={isPlaying ? pauseAudio : startAudio}
+                  size="sm"
+                  className="rounded-xl"
+                >
+                  {isPlaying ? (
+                    <>
+                      <Pause className="mr-2 h-4 w-4" />
+                      Pause
+                    </>
+                  ) : (
+                    <>
+                      <Play className="mr-2 h-4 w-4" />
+                      Play
+                    </>
+                  )}
+                </Button>
+              )}
+
+              {viewMode === "video" && (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={isPlaying ? pauseAudio : startAudio}
+                    size="sm"
+                    className="rounded-xl"
+                  >
+                    {isPlaying ? (
+                      <>
+                        <Pause className="mr-2 h-4 w-4" />
+                        Pause
+                      </>
+                    ) : (
+                      <>
+                        <Play className="mr-2 h-4 w-4" />
+                        Play
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsMuted(!isMuted)}
+                    size="sm"
+                    className="rounded-xl"
+                  >
+                    {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                  </Button>
+                </>
+              )}
 
               <Button
                 variant={showChat ? "default" : "outline"}
@@ -254,10 +415,10 @@ export const BookReader = ({ book, onBack }: BookReaderProps) => {
                     <span className="text-sm font-medium text-muted-foreground">
                       {pages.length > 1 ? `Page ${currentPage + 1} of ${pages.length}` : 'Reading'}
                     </span>
-                    {isTranslating && (
+                    {(isTranslating || isLoadingVideo) && (
                       <span className="flex items-center gap-2 text-xs text-primary">
                         <Loader2 className="h-3 w-3 animate-spin" />
-                        Translating...
+                        {isTranslating ? 'Translating...' : 'Generating...'}
                       </span>
                     )}
                   </div>
@@ -268,7 +429,7 @@ export const BookReader = ({ book, onBack }: BookReaderProps) => {
                           variant="outline"
                           size="sm"
                           onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
-                          disabled={currentPage === 0 || isTranslating}
+                          disabled={currentPage === 0 || isTranslating || isLoadingVideo}
                           className="rounded-lg h-8"
                         >
                           Previous
@@ -277,7 +438,7 @@ export const BookReader = ({ book, onBack }: BookReaderProps) => {
                           variant="outline"
                           size="sm"
                           onClick={() => setCurrentPage(p => Math.min(pages.length - 1, p + 1))}
-                          disabled={currentPage === pages.length - 1 || isTranslating}
+                          disabled={currentPage === pages.length - 1 || isTranslating || isLoadingVideo}
                           className="rounded-lg h-8"
                         >
                           Next
@@ -288,16 +449,76 @@ export const BookReader = ({ book, onBack }: BookReaderProps) => {
                 </div>
               </div>
               
-              <ScrollArea className="h-[calc(100vh-16rem)]">
-                <div 
-                  className="p-8 prose prose-lg max-w-none dark:prose-invert"
-                  onMouseUp={handleTextSelection}
-                >
-                  <div className="font-serif leading-relaxed whitespace-pre-wrap text-foreground">
-                    {displayContent}
+              {viewMode === "text" && (
+                <ScrollArea className="h-[calc(100vh-16rem)]">
+                  <div 
+                    className="p-8 prose prose-lg max-w-none dark:prose-invert"
+                    onMouseUp={handleTextSelection}
+                  >
+                    <div className="font-serif leading-relaxed whitespace-pre-wrap text-foreground">
+                      {displayContent}
+                    </div>
+                  </div>
+                </ScrollArea>
+              )}
+
+              {viewMode === "audio" && (
+                <div className="h-[calc(100vh-16rem)] flex items-center justify-center p-8">
+                  <div className="text-center space-y-8 max-w-2xl">
+                    <div className="relative">
+                      <div className="w-48 h-48 mx-auto rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center animate-pulse">
+                        <Volume2 className="h-24 w-24 text-white" />
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <h3 className="text-2xl font-bold">Audiobook Mode</h3>
+                      <p className="text-muted-foreground">
+                        {isPlaying ? 'Playing...' : 'Click Play to start listening'}
+                      </p>
+                    </div>
+                    <ScrollArea className="h-64 rounded-xl border border-border/50 bg-background/50 p-4">
+                      <div className="font-serif text-sm leading-relaxed text-foreground/80">
+                        {displayContent}
+                      </div>
+                    </ScrollArea>
                   </div>
                 </div>
-              </ScrollArea>
+              )}
+
+              {viewMode === "video" && (
+                <div className="h-[calc(100vh-16rem)] relative">
+                  {videoImage ? (
+                    <div className="relative h-full">
+                      <img 
+                        src={videoImage} 
+                        alt="Book scene" 
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-6">
+                        <ScrollArea className="h-32">
+                          <p className="text-white text-lg font-medium leading-relaxed">
+                            {displayContent.slice(0, 300)}...
+                          </p>
+                        </ScrollArea>
+                      </div>
+                    </div>
+                  ) : isLoadingVideo ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center space-y-4">
+                        <Loader2 className="h-16 w-16 animate-spin text-primary mx-auto" />
+                        <p className="text-muted-foreground">Generating video scene...</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <Button onClick={generateVideoImage} size="lg" className="rounded-xl">
+                        <Video className="mr-2 h-5 w-5" />
+                        Generate Video Scene
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
             </Card>
           </div>
 

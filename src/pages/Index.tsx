@@ -37,7 +37,7 @@ const Index = () => {
   return (
     <div className="min-h-screen">
       {currentView === "hero" && <Hero onGetStarted={handleGetStarted} />}
-      {currentView === "search" && <BookSearch onSelectBook={handleSelectBook} />}
+      {currentView === "search" && <BookSearch onSelectBook={handleSelectBook} onBack={handleBack} />}
       {currentView === "reader" && selectedBook && (
         <BookReader book={selectedBook} onBack={handleBack} />
       )}
