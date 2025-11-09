@@ -19,9 +19,9 @@ serve(async (req) => {
 
     console.log('Translation request:', { textLength: text.length, targetLanguage });
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    const LOVE_API_KEY = Deno.env.get("LOVE_API_KEY");
+    if (!LOVE_API_KEY) {
+      throw new Error("LOVE_API_KEY is not configured");
     }
 
     const languageNames: Record<string, string> = {
@@ -47,10 +47,10 @@ serve(async (req) => {
 
     const targetLangName = languageNames[targetLanguage] || targetLanguage;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://ai.gateway.LOVE.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+        "Authorization": `Bearer ${LOVE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

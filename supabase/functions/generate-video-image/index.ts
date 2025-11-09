@@ -12,18 +12,18 @@ serve(async (req) => {
 
   try {
     const { prompt } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const LOVE_API_KEY = Deno.env.get('LOVE_API_KEY');
 
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
+    if (!LOVE_API_KEY) {
+      throw new Error('LOVE_API_KEY is not configured');
     }
 
-    console.log('Generating image with Lovable AI for prompt:', prompt);
+    console.log('Generating image with LOVE AI for prompt:', prompt);
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const response = await fetch('https://ai.gateway.LOVE.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': `Bearer ${LOVE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -44,14 +44,14 @@ serve(async (req) => {
         });
       }
       if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Payment required, please add funds to your Lovable AI workspace." }), {
+        return new Response(JSON.stringify({ error: "Payment required, please add funds to your LOVE AI workspace." }), {
           status: 402,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const errorText = await response.text();
-      console.error('Lovable AI error:', errorText);
-      throw new Error(`Lovable AI error: ${response.status}`);
+      console.error('LOVE AI error:', errorText);
+      throw new Error(`LOVE AI error: ${response.status}`);
     }
 
     const data = await response.json();
